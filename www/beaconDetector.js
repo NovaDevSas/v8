@@ -45,7 +45,7 @@ var BeaconDetector = {
      * @param {Function} errorCallback - Error callback
      */
     isPluginAvailable: function(successCallback, errorCallback) {
-        if (typeof cordova !== 'undefined' && typeof window.BeaconDetector !== 'undefined') {
+        if (typeof cordova !== 'undefined' && typeof window.beaconDetector !== 'undefined') {
             successCallback(true);
         } else {
             // Try to check via exec
