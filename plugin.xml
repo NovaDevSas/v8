@@ -8,7 +8,7 @@
     <keywords>cordova,beacon,ibeacon,eddystone,bluetooth,ble</keywords>
     
     <js-module src="www/beaconDetector.js" name="BeaconDetector">
-        <clobbers target="BeaconDetector" />
+        <clobbers target="beaconDetector" />
     </js-module>
     
     <!-- Android Configuration -->
