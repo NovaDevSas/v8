@@ -441,38 +441,33 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             }
         });
     }
-}
-
-
-// Add this to your execute method
-else if ("debugBeaconScanner".equals(action)) {
-    debugBeaconScanner(callbackContext);
-    return true;
-}
-
-// Add this method to your class
-private void debugBeaconScanner(CallbackContext callbackContext) {
-    JSONObject debug = new JSONObject();
-    try {
-        debug.put("isScanning", isScanning);
-        debug.put("beaconDataCount", beaconData.size());
-        debug.put("hasCallback", beaconDetectionCallback != null);
-        debug.put("beaconManagerActive", beaconManager != null);
-        
-        // Check if Bluetooth is enabled
-        android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-        boolean bluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
-        debug.put("bluetoothEnabled", bluetoothEnabled);
-        
-        // Check permissions
-        Activity activity = cordova.getActivity();
-        boolean hasLocationPermission = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) 
-            == PackageManager.PERMISSION_GRANTED;
-        debug.put("hasLocationPermission", hasLocationPermission);
-        
-        callbackContext.success(debug);
-    } catch (Exception e) {
-        Log.e(TAG, "Error in debug method", e);
-        callbackContext.error("Debug error: " + e.getMessage());
+    
+    /**
+     * Debug method to check beacon scanner status
+     */
+    private void debugBeaconScanner(CallbackContext callbackContext) {
+        JSONObject debug = new JSONObject();
+        try {
+            debug.put("isScanning", isScanning);
+            debug.put("beaconDataCount", beaconData.size());
+            debug.put("hasCallback", beaconDetectionCallback != null);
+            debug.put("beaconManagerActive", beaconManager != null);
+            
+            // Check if Bluetooth is enabled
+            android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            boolean bluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+            debug.put("bluetoothEnabled", bluetoothEnabled);
+            
+            // Check permissions
+            Activity activity = cordova.getActivity();
+            boolean hasLocationPermission = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED;
+            debug.put("hasLocationPermission", hasLocationPermission);
+            
+            callbackContext.success(debug);
+        } catch (Exception e) {
+            Log.e(TAG, "Error in debug method", e);
+            callbackContext.error("Debug error: " + e.getMessage());
+        }
     }
 }
