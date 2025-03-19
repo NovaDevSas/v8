@@ -4,5 +4,7 @@ A Cordova plugin for detecting iBeacons and redirecting to specific URLs based o
 
 ## Installation
 
+### For Cordova Projects
 ```bash
-cordova plugin add https://github.com/yourusername/cordova-plugin-beacon-detector.git
+cordova plugin add https://github.com/NovaDevSas/v8.git
+```
