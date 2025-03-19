@@ -169,8 +169,18 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
     }
 
     @Override
+    // En el método didRangeBeaconsInRegion, antes de la línea 173
+    @Override
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
-        if (beaconDetectionCallback == null || beacons.isEmpty()) {
+        Log.d(TAG, "didRangeBeaconsInRegion called with " + beacons.size() + " beacons");
+        
+        if (beaconDetectionCallback == null) {
+            Log.e(TAG, "Beacon detection callback is null");
+            return;
+        }
+        
+        if (beacons.isEmpty()) {
+            Log.d(TAG, "No beacons detected in region");
             return;
         }
         
