@@ -37,6 +37,44 @@ var BeaconDetector = {
         exec(callback, function(error) {
             console.error('Error in beacon detection callback: ' + error);
         }, 'BeaconDetector', 'onBeaconDetected', []);
+    },
+    
+    /**
+     * Check if the plugin is available
+     * @param {Function} successCallback - Success callback with boolean result
+     * @param {Function} errorCallback - Error callback
+     */
+    isPluginAvailable: function(successCallback, errorCallback) {
+        if (typeof cordova !== 'undefined' && typeof window.BeaconDetector !== 'undefined') {
+            successCallback(true);
+        } else {
+            // Try to check via exec
+            exec(
+                function() { successCallback(true); },
+                function() { successCallback(false); },
+                'BeaconDetector', 
+                'isAvailable', 
+                []
+            );
+        }
+    },
+    
+    /**
+     * Check if the device supports beacon detection
+     * @param {Function} successCallback - Success callback with compatibility info
+     * @param {Function} errorCallback - Error callback
+     */
+    checkCompatibility: function(successCallback, errorCallback) {
+        exec(successCallback, errorCallback, 'BeaconDetector', 'checkCompatibility', []);
+    },
+    
+    /**
+     * Get a list of detected beacons without starting continuous scanning
+     * @param {Function} successCallback - Success callback with list of beacons
+     * @param {Function} errorCallback - Error callback
+     */
+    listDetectedBeacons: function(successCallback, errorCallback) {
+        exec(successCallback, errorCallback, 'BeaconDetector', 'listDetectedBeacons', []);
     }
 };
 
