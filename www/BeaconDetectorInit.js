@@ -53,6 +53,20 @@ document.addEventListener('deviceready', function() {
             return new Promise(function(resolve, reject) {
                 window.beaconDetector.listDetectedBeacons(resolve, reject);
             });
+        },
+        
+        // Añadido coma para corregir el error de sintaxis
+        debugBeaconScanner: function() {
+            return new Promise(function(resolve, reject) {
+                // Corregido para usar el método correcto
+                window.beaconDetector.exec(function(result) {
+                    console.log("Debug scanner result:", result);
+                    resolve(result);
+                }, function(error) {
+                    console.error("Debug scanner error:", error);
+                    reject(error);
+                }, 'BeaconDetector', 'debugBeaconScanner', []);
+            });
         }
     };
     

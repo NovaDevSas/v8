@@ -84,8 +84,11 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         } else if ("listDetectedBeacons".equals(action)) {
             listDetectedBeacons(callbackContext);
             return true;
+        } else if ("debugBeaconScanner".equals(action)) {
+            debugBeaconScanner(callbackContext);
+            return true;
         }
-        
+
         return false;
     }
 
@@ -128,8 +131,9 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                     return;
                 }
                 
-                // Create a region to scan for all beacons
+                // Use null identifiers to detect all beacons
                 region = new Region("AllBeaconsRegion", null, null, null);
+                Log.d(TAG, "Created region to scan for all beacons");
                 
                 // Start ranging beacons
                 beaconManager.startRangingBeacons(region);
@@ -169,8 +173,6 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
     }
 
     @Override
-    // En el método didRangeBeaconsInRegion, antes de la línea 173
-    @Override
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
         Log.d(TAG, "didRangeBeaconsInRegion called with " + beacons.size() + " beacons");
         
@@ -189,7 +191,10 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             int major = beacon.getId2().toInt();
             int minor = beacon.getId3().toInt();
             
+            Log.d(TAG, "Raw beacon detected: UUID=" + uuid + ", Major=" + major + ", Minor=" + minor + ", RSSI=" + beacon.getRssi());
+            
             // Find matching beacon in our data
+            boolean foundMatch = false;
             for (Map<String, Object> data : beaconData) {
                 if (uuid.equalsIgnoreCase((String) data.get("uuid")) &&
                     major == (int) data.get("major") &&
@@ -203,16 +208,23 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                         result.put("minor", minor);
                         result.put("url", data.get("url"));
                         result.put("distance", beacon.getDistance());
+                        result.put("rssi", beacon.getRssi());
                         
-                        Log.d(TAG, "Detected beacon: " + result.toString());
+                        Log.d(TAG, "Matched beacon: " + result.toString());
                         
                         PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
                         pluginResult.setKeepCallback(true);
                         beaconDetectionCallback.sendPluginResult(pluginResult);
+                        foundMatch = true;
+                        break;
                     } catch (JSONException e) {
                         Log.e(TAG, "Error creating JSON result", e);
                     }
                 }
+            }
+            
+            if (!foundMatch) {
+                Log.d(TAG, "Detected beacon does not match any configured beacons: UUID=" + uuid + ", Major=" + major + ", Minor=" + minor);
             }
         }
     }
@@ -428,5 +440,39 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                 callbackContext.error("Error listing beacons: " + e.getMessage());
             }
         });
+    }
+}
+
+
+// Add this to your execute method
+else if ("debugBeaconScanner".equals(action)) {
+    debugBeaconScanner(callbackContext);
+    return true;
+}
+
+// Add this method to your class
+private void debugBeaconScanner(CallbackContext callbackContext) {
+    JSONObject debug = new JSONObject();
+    try {
+        debug.put("isScanning", isScanning);
+        debug.put("beaconDataCount", beaconData.size());
+        debug.put("hasCallback", beaconDetectionCallback != null);
+        debug.put("beaconManagerActive", beaconManager != null);
+        
+        // Check if Bluetooth is enabled
+        android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+        boolean bluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+        debug.put("bluetoothEnabled", bluetoothEnabled);
+        
+        // Check permissions
+        Activity activity = cordova.getActivity();
+        boolean hasLocationPermission = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) 
+            == PackageManager.PERMISSION_GRANTED;
+        debug.put("hasLocationPermission", hasLocationPermission);
+        
+        callbackContext.success(debug);
+    } catch (Exception e) {
+        Log.e(TAG, "Error in debug method", e);
+        callbackContext.error("Debug error: " + e.getMessage());
     }
 }

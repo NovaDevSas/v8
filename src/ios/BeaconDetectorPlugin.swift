@@ -70,6 +70,7 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
                     self.locationManager.startRangingBeacons(in: region)
                     
                     self.monitoredRegions.append(region)
+                    print("Started monitoring region for UUID: \(uuidString)")
                 }
             }
             
@@ -117,8 +118,12 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
     
     // MARK: - CLLocationManagerDelegate
     
+    // Improve the beacon detection in locationManager:didRangeBeacons:inRegion:
     func locationManager(_ manager: CLLocationManager, didRangeBeacons beacons: [CLBeacon], in region: CLBeaconRegion) {
-        guard let callbackId = beaconDetectionCallbackId, !beacons.isEmpty else {
+        print("Ranged \(beacons.count) beacons in region: \(region.identifier)")
+        
+        guard let callbackId = beaconDetectionCallbackId else {
+            print("No callback ID for beacon detection")
             return
         }
         
@@ -127,26 +132,56 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
             let major = beacon.major.intValue
             let minor = beacon.minor.intValue
             
+            print("Raw beacon detected: UUID=\(uuid), Major=\(major), Minor=\(minor), Proximity=\(beacon.proximity.rawValue)")
+            
             // Find matching beacon in our data
             for data in beaconData {
                 if let dataUUID = data["uuid"] as? String,
                    let dataMajor = data["major"] as? Int,
                    let dataMinor = data["minor"] as? Int,
-                   dataUUID.lowercased() == uuid.lowercased() && dataMajor == major && dataMinor == minor {
+                   dataUUID.caseInsensitiveCompare(uuid) == .orderedSame,
+                   dataMajor == major,
+                   dataMinor == minor {
                     
-                    var result: [String: Any] = [:]
-                    result["title"] = data["title"]
-                    result["uuid"] = uuid
-                    result["major"] = major
-                    result["minor"] = minor
-                    result["url"] = data["url"]
-                    result["distance"] = calculateDistance(rssi: beacon.rssi, txPower: beacon.rssi - 59)
+                    var result: [String: Any] = [
+                        "uuid": uuid,
+                        "major": major,
+                        "minor": minor
+                    ]
                     
-                    print("Detected beacon: \(result)")
+                    if let title = data["title"] as? String {
+                        result["title"] = title
+                    }
                     
-                    let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: result)
-                    pluginResult?.setKeepCallbackAs(true)
-                    self.commandDelegate.send(pluginResult, callbackId: callbackId)
+                    if let url = data["url"] as? String {
+                        result["url"] = url
+                    }
+                    
+                    // Add proximity information
+                    result["proximity"] = beacon.proximity.rawValue
+                    
+                    // Calculate approximate distance
+                    var distance: Double = -1
+                    switch beacon.proximity {
+                    case .immediate:
+                        distance = 0.5
+                    case .near:
+                        distance = 2.0
+                    case .far:
+                        distance = 10.0
+                    default:
+                        distance = -1
+                    }
+                    result["distance"] = distance
+                    
+                    print("Matched beacon: \(result)")
+                    
+                    if let resultData = try? JSONSerialization.data(withJSONObject: result),
+                       let resultString = String(data: resultData, encoding: .utf8) {
+                        let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: resultString)
+                        pluginResult?.setKeepCallbackAs(true)
+                        self.commandDelegate.send(pluginResult, callbackId: callbackId)
+                    }
                 }
             }
         }
