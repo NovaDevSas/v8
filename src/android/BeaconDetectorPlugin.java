@@ -277,146 +277,146 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             }
         }
     }
-}
 
-/**
- * Check if the device is compatible with beacon detection
- */
-private void checkCompatibility(CallbackContext callbackContext) {
-    try {
-        Activity activity = cordova.getActivity();
-        JSONObject result = new JSONObject();
-        
-        // Check Bluetooth support
-        boolean hasBluetoothSupport = activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH);
-        result.put("bluetoothSupport", hasBluetoothSupport);
-        
-        // Check if Bluetooth is enabled
-        boolean isBluetoothEnabled = false;
+    /**
+     * Check if the device is compatible with beacon detection
+     */
+    private void checkCompatibility(CallbackContext callbackContext) {
         try {
-            android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-            isBluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
-        } catch (Exception e) {
-            Log.e(TAG, "Error checking Bluetooth state", e);
-        }
-        result.put("bluetoothEnabled", isBluetoothEnabled);
-        
-        // Check location permissions
-        boolean hasLocationPermissions = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            hasLocationPermissions = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        }
-        result.put("locationPermissions", hasLocationPermissions);
-        
-        // Check Bluetooth permissions for Android 12+
-        boolean hasBluetoothPermissions = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            hasBluetoothPermissions = activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-                    && activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
-        }
-        result.put("bluetoothPermissions", hasBluetoothPermissions);
-        
-        // Overall compatibility
-        boolean isCompatible = hasBluetoothSupport && isBluetoothEnabled && hasLocationPermissions && hasBluetoothPermissions;
-        result.put("isCompatible", isCompatible);
-        
-        callbackContext.success(result);
-    } catch (Exception e) {
-        Log.e(TAG, "Error checking compatibility", e);
-        callbackContext.error("Error checking compatibility: " + e.getMessage());
-    }
-}
-
-/**
- * List currently detected beacons without starting continuous scanning
- */
-private void listDetectedBeacons(CallbackContext callbackContext) {
-    if (beaconData.isEmpty()) {
-        callbackContext.error("No beacon data initialized. Call initialize() first.");
-        return;
-    }
-    
-    cordova.getThreadPool().execute(() -> {
-        try {
-            // Check permissions
-            if (!checkAndRequestPermissions()) {
-                callbackContext.error("Required permissions not granted");
-                return;
+            Activity activity = cordova.getActivity();
+            JSONObject result = new JSONObject();
+            
+            // Check Bluetooth support
+            boolean hasBluetoothSupport = activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH);
+            result.put("bluetoothSupport", hasBluetoothSupport);
+            
+            // Check if Bluetooth is enabled
+            boolean isBluetoothEnabled = false;
+            try {
+                android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+                isBluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking Bluetooth state", e);
             }
+            result.put("bluetoothEnabled", isBluetoothEnabled);
             
-            // Create a temporary region for a single scan
-            Region tempRegion = new Region("TempScanRegion", null, null, null);
+            // Check location permissions
+            boolean hasLocationPermissions = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                hasLocationPermissions = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+            }
+            result.put("locationPermissions", hasLocationPermissions);
             
-            // Create a temporary callback for this scan
-            RangeNotifier tempRangeNotifier = new RangeNotifier() {
-                @Override
-                public void didRangeBeaconsInRegion(Collection<Beacon> detectedBeacons, Region region) {
-                    try {
-                        JSONArray beaconArray = new JSONArray();
-                        
-                        for (Beacon beacon : detectedBeacons) {
-                            String uuid = beacon.getId1().toString();
-                            int major = beacon.getId2().toInt();
-                            int minor = beacon.getId3().toInt();
+            // Check Bluetooth permissions for Android 12+
+            boolean hasBluetoothPermissions = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                hasBluetoothPermissions = activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                        && activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            }
+            result.put("bluetoothPermissions", hasBluetoothPermissions);
+            
+            // Overall compatibility
+            boolean isCompatible = hasBluetoothSupport && isBluetoothEnabled && hasLocationPermissions && hasBluetoothPermissions;
+            result.put("isCompatible", isCompatible);
+            
+            callbackContext.success(result);
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking compatibility", e);
+            callbackContext.error("Error checking compatibility: " + e.getMessage());
+        }
+    }
+
+    /**
+     * List currently detected beacons without starting continuous scanning
+     */
+    private void listDetectedBeacons(CallbackContext callbackContext) {
+        if (beaconData.isEmpty()) {
+            callbackContext.error("No beacon data initialized. Call initialize() first.");
+            return;
+        }
+        
+        cordova.getThreadPool().execute(() -> {
+            try {
+                // Check permissions
+                if (!checkAndRequestPermissions()) {
+                    callbackContext.error("Required permissions not granted");
+                    return;
+                }
+                
+                // Create a temporary region for a single scan
+                Region tempRegion = new Region("TempScanRegion", null, null, null);
+                
+                // Create a temporary callback for this scan
+                RangeNotifier tempRangeNotifier = new RangeNotifier() {
+                    @Override
+                    public void didRangeBeaconsInRegion(Collection<Beacon> detectedBeacons, Region region) {
+                        try {
+                            JSONArray beaconArray = new JSONArray();
                             
-                            JSONObject beaconObj = new JSONObject();
-                            beaconObj.put("uuid", uuid);
-                            beaconObj.put("major", major);
-                            beaconObj.put("minor", minor);
-                            beaconObj.put("distance", beacon.getDistance());
-                            beaconObj.put("rssi", beacon.getRssi());
-                            
-                            // Find matching beacon in our data
-                            for (Map<String, Object> data : beaconData) {
-                                if (uuid.equalsIgnoreCase((String) data.get("uuid")) &&
-                                    major == (int) data.get("major") &&
-                                    minor == (int) data.get("minor")) {
-                                    
-                                    beaconObj.put("title", data.get("title"));
-                                    beaconObj.put("url", data.get("url"));
-                                    break;
+                            for (Beacon beacon : detectedBeacons) {
+                                String uuid = beacon.getId1().toString();
+                                int major = beacon.getId2().toInt();
+                                int minor = beacon.getId3().toInt();
+                                
+                                JSONObject beaconObj = new JSONObject();
+                                beaconObj.put("uuid", uuid);
+                                beaconObj.put("major", major);
+                                beaconObj.put("minor", minor);
+                                beaconObj.put("distance", beacon.getDistance());
+                                beaconObj.put("rssi", beacon.getRssi());
+                                
+                                // Find matching beacon in our data
+                                for (Map<String, Object> data : beaconData) {
+                                    if (uuid.equalsIgnoreCase((String) data.get("uuid")) &&
+                                        major == (int) data.get("major") &&
+                                        minor == (int) data.get("minor")) {
+                                        
+                                        beaconObj.put("title", data.get("title"));
+                                        beaconObj.put("url", data.get("url"));
+                                        break;
+                                    }
                                 }
+                                
+                                beaconArray.put(beaconObj);
                             }
                             
-                            beaconArray.put(beaconObj);
+                            // Stop ranging after getting results
+                            beaconManager.stopRangingBeacons(tempRegion);
+                            
+                            callbackContext.success(beaconArray);
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error processing beacon list", e);
+                            callbackContext.error("Error processing beacon list: " + e.getMessage());
                         }
-                        
-                        // Stop ranging after getting results
+                    }
+                };
+                
+                // Set the temporary range notifier
+                beaconManager.addRangeNotifier(tempRangeNotifier);
+                
+                // Start a single scan
+                beaconManager.startRangingBeacons(tempRegion);
+                
+                // Set a timeout to ensure we return something even if no beacons are found
+                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+                handler.postDelayed(() -> {
+                    try {
                         beaconManager.stopRangingBeacons(tempRegion);
+                        beaconManager.removeRangeNotifier(tempRangeNotifier);
                         
-                        callbackContext.success(beaconArray);
+                        // If callback hasn't been invoked yet, return empty array
+                        if (!callbackContext.isFinished()) {
+                            callbackContext.success(new JSONArray());
+                        }
                     } catch (Exception e) {
-                        Log.e(TAG, "Error processing beacon list", e);
-                        callbackContext.error("Error processing beacon list: " + e.getMessage());
+                        Log.e(TAG, "Error in scan timeout", e);
                     }
-                }
-            };
-            
-            // Set the temporary range notifier
-            beaconManager.addRangeNotifier(tempRangeNotifier);
-            
-            // Start a single scan
-            beaconManager.startRangingBeacons(tempRegion);
-            
-            // Set a timeout to ensure we return something even if no beacons are found
-            android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-            handler.postDelayed(() -> {
-                try {
-                    beaconManager.stopRangingBeacons(tempRegion);
-                    beaconManager.removeRangeNotifier(tempRangeNotifier);
-                    
-                    // If callback hasn't been invoked yet, return empty array
-                    if (!callbackContext.isFinished()) {
-                        callbackContext.success(new JSONArray());
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error in scan timeout", e);
-                }
-            }, 5000); // 5 second timeout
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error listing beacons", e);
-            callbackContext.error("Error listing beacons: " + e.getMessage());
-        }
-    });
+                }, 5000); // 5 second timeout
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Error listing beacons", e);
+                callbackContext.error("Error listing beacons: " + e.getMessage());
+            }
+        });
+    }
 }
