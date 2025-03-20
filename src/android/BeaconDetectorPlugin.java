@@ -332,7 +332,47 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         }
     }
     
-    // Add the missing method implementation for RangeNotifier interface
+    // Add the missing checkCompatibility method
+    private void checkCompatibility(CallbackContext callbackContext) {
+        try {
+            Activity activity = cordova.getActivity();
+            JSONObject result = new JSONObject();
+            
+            // Check Bluetooth support
+            android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            boolean bluetoothSupport = bluetoothAdapter != null;
+            boolean bluetoothEnabled = bluetoothSupport && bluetoothAdapter.isEnabled();
+            
+            result.put("bluetoothSupport", bluetoothSupport);
+            result.put("bluetoothEnabled", bluetoothEnabled);
+            
+            // Check location permissions
+            boolean hasLocationPermission = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) 
+                == PackageManager.PERMISSION_GRANTED;
+            result.put("locationPermissions", hasLocationPermission);
+            
+            // Check Bluetooth permissions for Android 12+
+            boolean hasBluetoothPermissions = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                hasBluetoothPermissions = activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) 
+                    == PackageManager.PERMISSION_GRANTED
+                    && activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) 
+                    == PackageManager.PERMISSION_GRANTED;
+            }
+            result.put("bluetoothPermissions", hasBluetoothPermissions);
+            
+            // Overall compatibility
+            boolean isCompatible = bluetoothSupport && bluetoothEnabled && hasLocationPermission && hasBluetoothPermissions;
+            result.put("isCompatible", isCompatible);
+            
+            callbackContext.success(result);
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking compatibility", e);
+            callbackContext.error("Error checking compatibility: " + e.getMessage());
+        }
+    }
+    
+    // Add the missing didRangeBeaconsInRegion method required by RangeNotifier interface
     @Override
     public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
         if (beaconDetectionCallback != null) {
@@ -383,7 +423,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         }
     }
     
-    // Also implement the required methods for MonitorNotifier interface
+    // Add the required methods for MonitorNotifier interface
     @Override
     public void didEnterRegion(Region region) {
         Log.d(TAG, "Entered region: " + region.getUniqueId());
