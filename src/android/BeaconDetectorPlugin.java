@@ -35,6 +35,10 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
     private static final int PERMISSION_REQUEST_BLUETOOTH_SCAN = 3;
     private static final int PERMISSION_REQUEST_BLUETOOTH_CONNECT = 4;
+    
+    // Add rate limiting variables
+    private static final long MIN_SCAN_INTERVAL_MS = 5000; // 5 seconds minimum between scan operations
+    private long lastScanOperationTime = 0;
 
     private BeaconManager beaconManager;
     private List<Map<String, Object>> beaconData;
@@ -49,6 +53,12 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         Activity activity = cordova.getActivity();
         beaconManager = BeaconManager.getInstanceForApplication(activity.getApplicationContext());
         
+        // Configure scan periods to reduce frequency
+        beaconManager.setForegroundScanPeriod(1100); // 1.1 seconds
+        beaconManager.setForegroundBetweenScanPeriod(2200); // 2.2 seconds between scans
+        beaconManager.setBackgroundScanPeriod(5000); // 5 seconds
+        beaconManager.setBackgroundBetweenScanPeriod(60000); // 60 seconds between scans in background
+        
         // Add support for iBeacon format
         beaconManager.getBeaconParsers().add(new BeaconParser()
                 .setBeaconLayout("m:2-3=0215,i:4-19,i:20-21,i:22-23,p:24-24"));
@@ -58,7 +68,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         
         beaconData = new ArrayList<>();
         
-        Log.d(TAG, "BeaconDetectorPlugin initialized");
+        Log.d(TAG, "BeaconDetectorPlugin initialized with optimized scan periods");
     }
 
     @Override
@@ -123,6 +133,14 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             return;
         }
         
+        // Add rate limiting check
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastScanOperationTime < MIN_SCAN_INTERVAL_MS) {
+            Log.w(TAG, "Scan operation requested too soon after previous operation. Enforcing rate limit.");
+            callbackContext.error("Please wait before starting another scan operation");
+            return;
+        }
+        
         cordova.getThreadPool().execute(() -> {
             try {
                 // Check and request permissions
@@ -140,6 +158,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                 beaconManager.startMonitoringBeaconsInRegion(region);
                 
                 isScanning = true;
+                lastScanOperationTime = System.currentTimeMillis(); // Update timestamp
                 Log.d(TAG, "Started scanning for beacons");
                 callbackContext.success("Started scanning for beacons");
             } catch (Exception e) {
@@ -155,6 +174,14 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             return;
         }
         
+        // Add rate limiting check
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastScanOperationTime < MIN_SCAN_INTERVAL_MS) {
+            Log.w(TAG, "Scan operation requested too soon after previous operation. Enforcing rate limit.");
+            callbackContext.error("Please wait before stopping scan operation");
+            return;
+        }
+        
         cordova.getThreadPool().execute(() -> {
             try {
                 if (region != null) {
@@ -163,6 +190,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                 }
                 
                 isScanning = false;
+                lastScanOperationTime = System.currentTimeMillis(); // Update timestamp
                 Log.d(TAG, "Stopped scanning for beacons");
                 callbackContext.success("Stopped scanning for beacons");
             } catch (Exception e) {
@@ -172,188 +200,18 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         });
     }
 
-    @Override
-    public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
-        Log.d(TAG, "didRangeBeaconsInRegion called with " + beacons.size() + " beacons");
-        
-        if (beaconDetectionCallback == null) {
-            Log.e(TAG, "Beacon detection callback is null");
-            return;
-        }
-        
-        if (beacons.isEmpty()) {
-            Log.d(TAG, "No beacons detected in region");
-            return;
-        }
-        
-        for (Beacon beacon : beacons) {
-            String uuid = beacon.getId1().toString();
-            int major = beacon.getId2().toInt();
-            int minor = beacon.getId3().toInt();
-            
-            Log.d(TAG, "Raw beacon detected: UUID=" + uuid + ", Major=" + major + ", Minor=" + minor + ", RSSI=" + beacon.getRssi());
-            
-            // Find matching beacon in our data
-            boolean foundMatch = false;
-            for (Map<String, Object> data : beaconData) {
-                if (uuid.equalsIgnoreCase((String) data.get("uuid")) &&
-                    major == (int) data.get("major") &&
-                    minor == (int) data.get("minor")) {
-                    
-                    try {
-                        JSONObject result = new JSONObject();
-                        result.put("title", data.get("title"));
-                        result.put("uuid", uuid);
-                        result.put("major", major);
-                        result.put("minor", minor);
-                        result.put("url", data.get("url"));
-                        result.put("distance", beacon.getDistance());
-                        result.put("rssi", beacon.getRssi());
-                        
-                        Log.d(TAG, "Matched beacon: " + result.toString());
-                        
-                        PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
-                        pluginResult.setKeepCallback(true);
-                        beaconDetectionCallback.sendPluginResult(pluginResult);
-                        foundMatch = true;
-                        break;
-                    } catch (JSONException e) {
-                        Log.e(TAG, "Error creating JSON result", e);
-                    }
-                }
-            }
-            
-            if (!foundMatch) {
-                Log.d(TAG, "Detected beacon does not match any configured beacons: UUID=" + uuid + ", Major=" + major + ", Minor=" + minor);
-            }
-        }
-    }
-
-    @Override
-    public void didEnterRegion(Region region) {
-        Log.d(TAG, "Entered region: " + region.getUniqueId());
-    }
-
-    @Override
-    public void didExitRegion(Region region) {
-        Log.d(TAG, "Exited region: " + region.getUniqueId());
-    }
-
-    @Override
-    public void didDetermineStateForRegion(int state, Region region) {
-        Log.d(TAG, "Region state changed: " + state + " for region " + region.getUniqueId());
-    }
-
-    private boolean checkAndRequestPermissions() {
-        Activity activity = cordova.getActivity();
-        boolean needsPermissions = false;
-        
-        // Check location permissions
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                cordova.requestPermission(this, PERMISSION_REQUEST_COARSE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION);
-                needsPermissions = true;
-            }
-            
-            if (activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                cordova.requestPermission(this, PERMISSION_REQUEST_FINE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION);
-                needsPermissions = true;
-            }
-            
-            // For Android 12 (API 31) and above, we need BLUETOOTH_SCAN and BLUETOOTH_CONNECT permissions
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                    cordova.requestPermission(this, PERMISSION_REQUEST_BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_SCAN);
-                    needsPermissions = true;
-                }
-                
-                if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    cordova.requestPermission(this, PERMISSION_REQUEST_BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_CONNECT);
-                    needsPermissions = true;
-                }
-            }
-        }
-        
-        return !needsPermissions;
-    }
-
-    @Override
-    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "Permission granted for request code: " + requestCode);
-        } else {
-            Log.e(TAG, "Permission denied for request code: " + requestCode);
-        }
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (isScanning && region != null) {
-            try {
-                beaconManager.stopRangingBeacons(region);
-                beaconManager.stopMonitoringBeaconsInRegion(region);
-                isScanning = false;
-            } catch (Exception e) {
-                Log.e(TAG, "Error stopping beacon scanning on destroy", e);
-            }
-        }
-    }
-
-    /**
-     * Check if the device is compatible with beacon detection
-     */
-    private void checkCompatibility(CallbackContext callbackContext) {
-        try {
-            Activity activity = cordova.getActivity();
-            JSONObject result = new JSONObject();
-            
-            // Check Bluetooth support
-            boolean hasBluetoothSupport = activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH);
-            result.put("bluetoothSupport", hasBluetoothSupport);
-            
-            // Check if Bluetooth is enabled
-            boolean isBluetoothEnabled = false;
-            try {
-                android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-                isBluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
-            } catch (Exception e) {
-                Log.e(TAG, "Error checking Bluetooth state", e);
-            }
-            result.put("bluetoothEnabled", isBluetoothEnabled);
-            
-            // Check location permissions
-            boolean hasLocationPermissions = true;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                hasLocationPermissions = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-            }
-            result.put("locationPermissions", hasLocationPermissions);
-            
-            // Check Bluetooth permissions for Android 12+
-            boolean hasBluetoothPermissions = true;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                hasBluetoothPermissions = activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-                        && activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
-            }
-            result.put("bluetoothPermissions", hasBluetoothPermissions);
-            
-            // Overall compatibility
-            boolean isCompatible = hasBluetoothSupport && isBluetoothEnabled && hasLocationPermissions && hasBluetoothPermissions;
-            result.put("isCompatible", isCompatible);
-            
-            callbackContext.success(result);
-        } catch (Exception e) {
-            Log.e(TAG, "Error checking compatibility", e);
-            callbackContext.error("Error checking compatibility: " + e.getMessage());
-        }
-    }
-
-    /**
-     * List currently detected beacons without starting continuous scanning
-     */
+    // Also modify the listDetectedBeacons method to include rate limiting
     private void listDetectedBeacons(CallbackContext callbackContext) {
         if (beaconData.isEmpty()) {
             callbackContext.error("No beacon data initialized. Call initialize() first.");
+            return;
+        }
+        
+        // Add rate limiting check
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastScanOperationTime < MIN_SCAN_INTERVAL_MS) {
+            Log.w(TAG, "Scan operation requested too soon after previous operation. Enforcing rate limit.");
+            callbackContext.error("Please wait before requesting another beacon scan");
             return;
         }
         
@@ -367,6 +225,9 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                 
                 // Create a temporary region for a single scan
                 Region tempRegion = new Region("TempScanRegion", null, null, null);
+                
+                // Update timestamp
+                lastScanOperationTime = System.currentTimeMillis();
                 
                 // Create a temporary callback for this scan
                 RangeNotifier tempRangeNotifier = new RangeNotifier() {

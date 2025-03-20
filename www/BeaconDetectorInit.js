@@ -7,25 +7,71 @@ document.addEventListener('deviceready', function() {
         return;
     }
     
+    // Add debouncing functionality
+    function debounce(func, wait) {
+        let timeout;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                func.apply(context, args);
+            }, wait);
+        };
+    }
+    
     // Define la interfaz BeaconDetectorPlugin
     window.BeaconDetectorPlugin = {
+        // Add a flag to track if operations are in progress
+        _operationInProgress: false,
+        
         initialize: function(beaconData) {
             return new Promise(function(resolve, reject) {
                 window.beaconDetector.initialize(beaconData, resolve, reject);
             });
         },
         
-        startScanning: function() {
-            return new Promise(function(resolve, reject) {
-                window.beaconDetector.startScanning(resolve, reject);
+        startScanning: debounce(function() {
+            if (this._operationInProgress) {
+                console.warn("Operation already in progress, please wait");
+                return Promise.reject("Operation already in progress");
+            }
+            
+            this._operationInProgress = true;
+            return new Promise((resolve, reject) => {
+                window.beaconDetector.startScanning(
+                    (result) => {
+                        this._operationInProgress = false;
+                        resolve(result);
+                    },
+                    (error) => {
+                        this._operationInProgress = false;
+                        reject(error);
+                    }
+                );
             });
-        },
+        }, 5000), // 5 second debounce
         
-        stopScanning: function() {
-            return new Promise(function(resolve, reject) {
-                window.beaconDetector.stopScanning(resolve, reject);
+        stopScanning: debounce(function() {
+            if (this._operationInProgress) {
+                console.warn("Operation already in progress, please wait");
+                return Promise.reject("Operation already in progress");
+            }
+            
+            this._operationInProgress = true;
+            return new Promise((resolve, reject) => {
+                window.beaconDetector.stopScanning(
+                    (result) => {
+                        this._operationInProgress = false;
+                        resolve(result);
+                    },
+                    (error) => {
+                        this._operationInProgress = false;
+                        reject(error);
+                    }
+                );
             });
-        },
+        }, 5000), // 5 second debounce
         
         onBeaconDetected: function(callback) {
             console.log("Configurando callback de detección de beacons");
