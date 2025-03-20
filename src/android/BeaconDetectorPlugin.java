@@ -406,7 +406,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
                     beaconArray.put(beaconObj);
                 }
                 
-                // Send the result back to JavaScript
+                // Solo enviar los datos sin redirección
                 PluginResult result = new PluginResult(PluginResult.Status.OK, beaconArray);
                 result.setKeepCallback(true); // Keep the callback for future beacon detections
                 beaconDetectionCallback.sendPluginResult(result);

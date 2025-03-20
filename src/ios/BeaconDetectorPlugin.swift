@@ -127,6 +127,8 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
             return
         }
         
+        var beaconArray: [[String: Any]] = []
+        
         for beacon in beacons {
             let uuid = beacon.uuid.uuidString
             let major = beacon.major.intValue
@@ -134,56 +136,52 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
             
             print("Raw beacon detected: UUID=\(uuid), Major=\(major), Minor=\(minor), Proximity=\(beacon.proximity.rawValue)")
             
+            var beaconInfo: [String: Any] = [
+                "uuid": uuid,
+                "major": major,
+                "minor": minor,
+                "rssi": beacon.rssi,
+                "proximity": beacon.proximity.rawValue
+            ]
+            
+            // Calculate approximate distance
+            if #available(iOS 13.0, *) {
+                beaconInfo["distance"] = beacon.proximity.rawValue
+            } else {
+                // Estimate distance for older iOS versions
+                let txPower = -59 // Default value, adjust if needed
+                beaconInfo["distance"] = calculateDistance(rssi: beacon.rssi, txPower: txPower)
+            }
+            
             // Find matching beacon in our data
             for data in beaconData {
                 if let dataUUID = data["uuid"] as? String,
                    let dataMajor = data["major"] as? Int,
                    let dataMinor = data["minor"] as? Int,
-                   dataUUID.caseInsensitiveCompare(uuid) == .orderedSame,
+                   dataUUID.lowercased() == uuid.lowercased(),
                    dataMajor == major,
                    dataMinor == minor {
                     
-                    var result: [String: Any] = [
-                        "uuid": uuid,
-                        "major": major,
-                        "minor": minor
-                    ]
-                    
                     if let title = data["title"] as? String {
-                        result["title"] = title
+                        beaconInfo["title"] = title
                     }
                     
                     if let url = data["url"] as? String {
-                        result["url"] = url
+                        beaconInfo["url"] = url
                     }
                     
-                    // Add proximity information
-                    result["proximity"] = beacon.proximity.rawValue
-                    
-                    // Calculate approximate distance
-                    var distance: Double = -1
-                    switch beacon.proximity {
-                    case .immediate:
-                        distance = 0.5
-                    case .near:
-                        distance = 2.0
-                    case .far:
-                        distance = 10.0
-                    default:
-                        distance = -1
-                    }
-                    result["distance"] = distance
-                    
-                    print("Matched beacon: \(result)")
-                    
-                    if let resultData = try? JSONSerialization.data(withJSONObject: result),
-                       let resultString = String(data: resultData, encoding: .utf8) {
-                        let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: resultString)
-                        pluginResult?.setKeepCallbackAs(true)
-                        self.commandDelegate.send(pluginResult, callbackId: callbackId)
-                    }
+                    break
                 }
             }
+            
+            beaconArray.append(beaconInfo)
+        }
+        
+        // Solo enviar los datos sin redirección
+        if !beaconArray.isEmpty {
+            let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: beaconArray)
+            pluginResult?.setKeepCallbackAs(true)
+            self.commandDelegate.send(pluginResult, callbackId: callbackId)
         }
     }
     

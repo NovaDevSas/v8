@@ -75,10 +75,11 @@ document.addEventListener('deviceready', function() {
         
         onBeaconDetected: function(callback) {
             console.log("Configurando callback de detección de beacons");
-            // Envolvemos el callback original para agregar logs
-            const wrappedCallback = function(beacon) {
-                console.log("Beacon detectado:", JSON.stringify(beacon));
-                callback(beacon);
+            // Envolvemos el callback original para agregar logs y eliminar la redirección
+            const wrappedCallback = function(beacons) {
+                console.log("Beacons detectados:", JSON.stringify(beacons));
+                // Solo pasamos los datos al callback sin redirección
+                callback(beacons);
             };
             window.beaconDetector.onBeaconDetected(wrappedCallback);
         },

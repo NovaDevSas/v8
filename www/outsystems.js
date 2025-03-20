@@ -172,11 +172,22 @@ if (typeof cordova !== 'undefined') {
                             
                             // Mensaje enfocado en UUID, Major y Minor
                             var mensaje = "Beacon detectado - UUID: " + beacon.uuid + ", Major: " + beacon.major + ", Minor: " + beacon.minor;
-                            $parameters.Message = mensaje;
-                            $actions.UpdateFeedbackMessage(mensaje);
-                            console.log("Beacon detectado con éxito:", JSON.stringify(beacon));
+                            // Reemplazar cualquier código de redirección automática con solo manejo de datos
+                            function handleBeaconDetection(beacon) {
+                            // Actualizar el mensaje con información del beacon
+                            $parameters.Message = "Beacon detectado: " + (beacon.title || "Desconocido");
+                            $actions.UpdateFeedbackMessage("Beacon detectado: " + (beacon.title || "Desconocido"));
                             
-                            // Enviar el UUID del beacon a OutSystems como parámetro
+                            // Guardar la información del beacon para uso posterior
+                            $parameters.DetectedBeacon = beacon;
+                            
+                            // Notificar a la aplicación sobre el beacon detectado (si es necesario)
+                            if (typeof $actions.OnBeaconDetected === 'function') {
+                                $actions.OnBeaconDetected(beacon);
+                            }
+                            
+                            // No realizar redirección automática
+                            }
                             $parameters.BeaconUUID = beacon.uuid;
                             $parameters.BeaconMajor = beacon.major;
                             $parameters.BeaconMinor = beacon.minor;
