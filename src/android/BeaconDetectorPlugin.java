@@ -331,4 +331,71 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             callbackContext.error("Debug error: " + e.getMessage());
         }
     }
+    
+    // Add the missing method implementation for RangeNotifier interface
+    @Override
+    public void didRangeBeaconsInRegion(Collection<Beacon> beacons, Region region) {
+        if (beaconDetectionCallback != null) {
+            try {
+                JSONArray beaconArray = new JSONArray();
+                
+                for (Beacon beacon : beacons) {
+                    String uuid = beacon.getId1().toString();
+                    int major = beacon.getId2().toInt();
+                    int minor = beacon.getId3().toInt();
+                    
+                    JSONObject beaconObj = new JSONObject();
+                    beaconObj.put("uuid", uuid);
+                    beaconObj.put("major", major);
+                    beaconObj.put("minor", minor);
+                    beaconObj.put("distance", beacon.getDistance());
+                    beaconObj.put("rssi", beacon.getRssi());
+                    
+                    // Find matching beacon in our data
+                    for (Map<String, Object> data : beaconData) {
+                        if (uuid.equalsIgnoreCase((String) data.get("uuid")) &&
+                            major == (int) data.get("major") &&
+                            minor == (int) data.get("minor")) {
+                            
+                            beaconObj.put("title", data.get("title"));
+                            beaconObj.put("url", data.get("url"));
+                            break;
+                        }
+                    }
+                    
+                    beaconArray.put(beaconObj);
+                }
+                
+                // Send the result back to JavaScript
+                PluginResult result = new PluginResult(PluginResult.Status.OK, beaconArray);
+                result.setKeepCallback(true); // Keep the callback for future beacon detections
+                beaconDetectionCallback.sendPluginResult(result);
+                
+                Log.d(TAG, "Detected " + beacons.size() + " beacons");
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing beacon detection", e);
+                
+                // Send error back to JavaScript
+                PluginResult result = new PluginResult(PluginResult.Status.ERROR, "Error processing beacon detection: " + e.getMessage());
+                result.setKeepCallback(true);
+                beaconDetectionCallback.sendPluginResult(result);
+            }
+        }
+    }
+    
+    // Also implement the required methods for MonitorNotifier interface
+    @Override
+    public void didEnterRegion(Region region) {
+        Log.d(TAG, "Entered region: " + region.getUniqueId());
+    }
+    
+    @Override
+    public void didExitRegion(Region region) {
+        Log.d(TAG, "Exited region: " + region.getUniqueId());
+    }
+    
+    @Override
+    public void didDetermineStateForRegion(int state, Region region) {
+        Log.d(TAG, "Region state changed to: " + (state == MonitorNotifier.INSIDE ? "INSIDE" : "OUTSIDE"));
+    }
 }
