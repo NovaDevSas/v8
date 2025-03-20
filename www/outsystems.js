@@ -103,24 +103,42 @@ if (typeof cordova !== 'undefined') {
                                         console.log("Beacons detectados:", JSON.stringify(beacons));
                                         
                                         // Si hay un beacon que coincide con nuestros datos configurados, redirigir
-                                        var matchedBeacon = beacons.find(function(beacon) {
+                                        var matchedBeacon = null;
+                                        for (var i = 0; i < beacons.length; i++) {
+                                            var detectedBeacon = beacons[i];
+                                            
                                             // Buscar en nuestros datos configurados
-                                            return beaconData.some(function(configBeacon) {
-                                                return beacon.uuid && configBeacon.uuid && 
-                                                       beacon.uuid.toLowerCase() === configBeacon.uuid.toLowerCase() &&
-                                                       beacon.major === configBeacon.major &&
-                                                       beacon.minor === configBeacon.minor;
-                                            });
-                                        });
+                                            for (var j = 0; j < beaconData.length; j++) {
+                                                var configBeacon = beaconData[j];
+                                                
+                                                if (detectedBeacon.uuid && 
+                                                    detectedBeacon.uuid.toLowerCase() === configBeacon.uuid.toLowerCase() &&
+                                                    detectedBeacon.major === configBeacon.major &&
+                                                    detectedBeacon.minor === configBeacon.minor) {
+                                                    
+                                                    // Encontramos una coincidencia, añadir la URL del beacon configurado
+                                                    matchedBeacon = {
+                                                        ...detectedBeacon,
+                                                        url: configBeacon.url,
+                                                        title: configBeacon.title || detectedBeacon.title
+                                                    };
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            if (matchedBeacon) break;
+                                        }
                                         
-                                        if (matchedBeacon) {
+                                        if (matchedBeacon && matchedBeacon.url) {
                                             // Detener el intervalo de verificación cuando se detecta un beacon con URL
                                             clearInterval(checkInterval);
                                             
                                             // Muestra mensaje de redirección
-                                            var redirectMsg = "Redirigiendo a: " + matchedBeacon.url;
+                                            var redirectMsg = "Beacon coincidente encontrado: " + matchedBeacon.title + 
+                                                             ". Redirigiendo a: " + matchedBeacon.url;
                                             $parameters.Message = redirectMsg;
                                             $actions.UpdateFeedbackMessage(redirectMsg);
+                                            console.log("Redirigiendo a beacon:", JSON.stringify(matchedBeacon));
                                             
                                             // Pequeña pausa antes de redireccionar
                                             setTimeout(function() {
