@@ -36,28 +36,28 @@ if (typeof cordova !== 'undefined') {
                         var beaconData = [
                           {
                             "title": "Audio",
-                            "uuid": "8C3889DC-3338-FF37-0E19-28BB83B37217",
+                            "uuid": "8c3889dc-3338-ff37-0e19-28bb83b37217",
                             "minor": 1,
                             "major": 11,
                             "url": "https://miportal.entel.cl/personas/catalogo/accesorios/audio"
                           },
                           {
                             "title": "Energía y protección para tú equipo",
-                            "uuid": "8C3889DC-3338-FF37-0E19-28BB83B37217",
+                            "uuid": "8c3889dc-3338-ff37-0e19-28bb83b37217",
                             "minor": 1,
                             "major": 12,
                             "url": "https://miportal.entel.cl/personas/catalogo/accesorios/_/N-1z140lnZ1z140faZ1z0of6i"
                           },
                           {
                             "title": "Dispositivos Apple",
-                            "uuid": "8C3889DC-3338-FF37-0E19-28BB83B37217",
+                            "uuid": "8c3889dc-3338-ff37-0e19-28bb83b37217",
                             "minor": 1,
                             "major": 13,
                             "url": "https://miportal.entel.cl/personas/catalogo/celulares/_/N-1z141c1"
                           },
                           {
                             "title": "Dispositivos Samsung",
-                            "uuid": "8C3889DC-3338-FF37-0E19-28BB83B37217",
+                            "uuid": "8c3889dc-3338-ff37-0e19-28bb83b37217",
                             "minor": 1,
                             "major": 14,
                             "url": "https://miportal.entel.cl/personas/catalogo/celulares/_/N-1z1416i"
@@ -104,7 +104,13 @@ if (typeof cordova !== 'undefined') {
                                         
                                         // Si hay un beacon que coincide con nuestros datos configurados, redirigir
                                         var matchedBeacon = beacons.find(function(beacon) {
-                                            return beacon.url && beacon.title;
+                                            // Buscar en nuestros datos configurados
+                                            return beaconData.some(function(configBeacon) {
+                                                return beacon.uuid && configBeacon.uuid && 
+                                                       beacon.uuid.toLowerCase() === configBeacon.uuid.toLowerCase() &&
+                                                       beacon.major === configBeacon.major &&
+                                                       beacon.minor === configBeacon.minor;
+                                            });
                                         });
                                         
                                         if (matchedBeacon) {
