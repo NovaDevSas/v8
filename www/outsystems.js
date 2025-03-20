@@ -86,9 +86,41 @@ if (typeof cordova !== 'undefined') {
                             BeaconDetectorPlugin.listDetectedBeacons()
                                 .then(function(beacons) {
                                     if (beacons && beacons.length > 0) {
-                                        $parameters.Message = "Se encontraron " + beacons.length + " beacons cercanos";
-                                        $actions.UpdateFeedbackMessage("Se encontraron " + beacons.length + " beacons cercanos");
+                                        // Mostrar información detallada de cada beacon encontrado
+                                        var beaconInfo = "Se encontraron " + beacons.length + " beacons cercanos:\n";
+                                        
+                                        beacons.forEach(function(beacon, index) {
+                                            beaconInfo += "\n" + (index + 1) + ". " + 
+                                                (beacon.title || "Beacon sin título") + 
+                                                " (UUID: " + beacon.uuid + 
+                                                ", Major: " + beacon.major + 
+                                                ", Minor: " + beacon.minor + 
+                                                ", Distancia: " + (beacon.distance ? beacon.distance.toFixed(2) + "m" : "desconocida") + ")";
+                                        });
+                                        
+                                        $parameters.Message = beaconInfo;
+                                        $actions.UpdateFeedbackMessage(beaconInfo);
                                         console.log("Beacons detectados:", JSON.stringify(beacons));
+                                        
+                                        // Si hay un beacon que coincide con nuestros datos configurados, redirigir
+                                        var matchedBeacon = beacons.find(function(beacon) {
+                                            return beacon.url && beacon.title;
+                                        });
+                                        
+                                        if (matchedBeacon) {
+                                            // Detener el intervalo de verificación cuando se detecta un beacon con URL
+                                            clearInterval(checkInterval);
+                                            
+                                            // Muestra mensaje de redirección
+                                            var redirectMsg = "Redirigiendo a: " + matchedBeacon.url;
+                                            $parameters.Message = redirectMsg;
+                                            $actions.UpdateFeedbackMessage(redirectMsg);
+                                            
+                                            // Pequeña pausa antes de redireccionar
+                                            setTimeout(function() {
+                                                window.location.href = matchedBeacon.url;
+                                            }, 3000);
+                                        }
                                     } else {
                                         console.log("No se detectaron beacons en esta verificación");
                                     }
