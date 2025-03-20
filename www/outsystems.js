@@ -74,15 +74,19 @@ if (typeof cordova !== 'undefined') {
                         $parameters.Message = "Plugin inicializado correctamente, comenzando escaneo...";
                         $actions.UpdateFeedbackMessage("Plugin inicializado correctamente, comenzando escaneo...");
                         
-                        // Comienza a escanear beacons
+                        // Comienza a escanear beacons SOLO UNA VEZ
                         return BeaconDetectorPlugin.startScanning();
                     })
                     .then(function() {
                         $parameters.Message = "Escaneo de beacons iniciado correctamente. Esperando detección...";
                         $actions.UpdateFeedbackMessage("Escaneo de beacons iniciado correctamente. Esperando detección...");
                         
+                        // Variable para controlar si ya se ha encontrado un beacon coincidente
+                        var beaconFound = false;
+                        
                         // Añadir un temporizador para verificar periódicamente los beacons detectados
                         var checkInterval = setInterval(function() {
+                            // Usamos listDetectedBeacons para obtener los beacons actuales sin iniciar un nuevo escaneo
                             BeaconDetectorPlugin.listDetectedBeacons()
                                 .then(function(beacons) {
                                     if (beacons && beacons.length > 0) {
@@ -90,12 +94,12 @@ if (typeof cordova !== 'undefined') {
                                         var beaconInfo = "Se encontraron " + beacons.length + " beacons cercanos:\n";
                                         
                                         beacons.forEach(function(beacon, index) {
-                                            beaconInfo += "\n" + (index + 1) + ". " + 
-                                                (beacon.title || "Beacon sin título") + 
-                                                " (UUID: " + beacon.uuid + 
+                                            // Destacar UUID, Major y Minor en el mensaje
+                                            beaconInfo += "\n" + (index + 1) + ". UUID: " + beacon.uuid + 
                                                 ", Major: " + beacon.major + 
-                                                ", Minor: " + beacon.minor + 
-                                                ", Distancia: " + (beacon.distance ? beacon.distance.toFixed(2) + "m" : "desconocida") + ")";
+                                                ", Minor: " + beacon.minor +
+                                                (beacon.title ? " (" + beacon.title + ")" : "") +
+                                                ", Distancia: " + (beacon.distance ? beacon.distance.toFixed(2) + "m" : "desconocida");
                                         });
                                         
                                         $parameters.Message = beaconInfo;
@@ -113,15 +117,22 @@ if (typeof cordova !== 'undefined') {
                                                 
                                                 if (detectedBeacon.uuid && 
                                                     detectedBeacon.uuid.toLowerCase() === configBeacon.uuid.toLowerCase() &&
-                                                    detectedBeacon.major === configBeacon.major &&
-                                                    detectedBeacon.minor === configBeacon.minor) {
+                                                    parseInt(detectedBeacon.major) === parseInt(configBeacon.major) &&
+                                                    parseInt(detectedBeacon.minor) === parseInt(configBeacon.minor)) {
                                                     
-                                                    // Encontramos una coincidencia, añadir la URL del beacon configurado
-                                                    matchedBeacon = {
-                                                        ...detectedBeacon,
-                                                        url: configBeacon.url,
-                                                        title: configBeacon.title || detectedBeacon.title
-                                                    };
+                                                    console.log("¡Coincidencia encontrada! Beacon detectado:", detectedBeacon);
+                                                    console.log("Beacon configurado:", configBeacon);
+                                                    
+                                                    // Encontramos una coincidencia, usar la URL del beacon configurado
+                                                    matchedBeacon = configBeacon;
+                                                    
+                                                    // Enviar el UUID del beacon a OutSystems como parámetro
+                                                    $parameters.BeaconUUID = detectedBeacon.uuid;
+                                                    $parameters.BeaconMajor = detectedBeacon.major;
+                                                    $parameters.BeaconMinor = detectedBeacon.minor;
+                                                    $parameters.BeaconTitle = configBeacon.title;
+                                                    $parameters.BeaconURL = configBeacon.url;
+                                                    
                                                     break;
                                                 }
                                             }
@@ -154,19 +165,27 @@ if (typeof cordova !== 'undefined') {
                                 });
                         }, 5000); // Verificar cada 5 segundos
                         
-                        // Configura el callback de detección de beacons
+                        // Configura el callback de detección de beacons - SOLO SE CONFIGURA UNA VEZ
                         BeaconDetectorPlugin.onBeaconDetected(function(beacon) {
                             // Detener el intervalo de verificación cuando se detecta un beacon
                             clearInterval(checkInterval);
                             
-                            var mensaje = "Beacon detectado: " + beacon.title + " (UUID: " + beacon.uuid + ", Major: " + beacon.major + ", Minor: " + beacon.minor + ")";
+                            // Mensaje enfocado en UUID, Major y Minor
+                            var mensaje = "Beacon detectado - UUID: " + beacon.uuid + ", Major: " + beacon.major + ", Minor: " + beacon.minor;
                             $parameters.Message = mensaje;
                             $actions.UpdateFeedbackMessage(mensaje);
                             console.log("Beacon detectado con éxito:", JSON.stringify(beacon));
                             
-                            // Muestra mensaje de redirección
-                            $parameters.Message = "Redirigiendo a: " + beacon.url;
-                            $actions.UpdateFeedbackMessage("Redirigiendo a: " + beacon.url);
+                            // Enviar el UUID del beacon a OutSystems como parámetro
+                            $parameters.BeaconUUID = beacon.uuid;
+                            $parameters.BeaconMajor = beacon.major;
+                            $parameters.BeaconMinor = beacon.minor;
+                            $parameters.BeaconTitle = beacon.title;
+                            $parameters.BeaconURL = beacon.url;
+                            
+                            // Muestra mensaje de redirección que incluye los identificadores del beacon
+                            $parameters.Message = "UUID: " + beacon.uuid + ", Major: " + beacon.major + ", Minor: " + beacon.minor + " - Redirigiendo a: " + beacon.url;
+                            $actions.UpdateFeedbackMessage("UUID: " + beacon.uuid + ", Major: " + beacon.major + ", Minor: " + beacon.minor + " - Redirigiendo a: " + beacon.url);
                             
                             // Pequeña pausa antes de redireccionar para que el usuario pueda ver el mensaje
                             setTimeout(function() {
