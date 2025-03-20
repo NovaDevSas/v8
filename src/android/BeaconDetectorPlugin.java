@@ -438,4 +438,33 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
     public void didDetermineStateForRegion(int state, Region region) {
         Log.d(TAG, "Region state changed to: " + (state == MonitorNotifier.INSIDE ? "INSIDE" : "OUTSIDE"));
     }
+    
+    // Mover este método dentro de la clase
+    private boolean checkAndRequestPermissions() {
+        Activity activity = cordova.getActivity();
+        List<String> permissionsNeeded = new ArrayList<>();
+        
+        // Verificar permisos de ubicación
+        if (activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+        
+        // Verificar permisos de Bluetooth para Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.BLUETOOTH_SCAN);
+            }
+            if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.BLUETOOTH_CONNECT);
+            }
+        }
+        
+        // Solicitar permisos si es necesario
+        if (!permissionsNeeded.isEmpty()) {
+            cordova.requestPermissions(this, 0, permissionsNeeded.toArray(new String[0]));
+            return false;
+        }
+        
+        return true;
+    }
 }
