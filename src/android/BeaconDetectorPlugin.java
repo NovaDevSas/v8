@@ -35,7 +35,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
     private static final int PERMISSION_REQUEST_BLUETOOTH_SCAN = 3;
     private static final int PERMISSION_REQUEST_BLUETOOTH_CONNECT = 4;
-    private static final int PERMISSION_REQUEST_NEARBY_DEVICES = 5;
+    // Remove PERMISSION_REQUEST_NEARBY_DEVICES constant
     
     // Add rate limiting variables
     private static final long MIN_SCAN_INTERVAL_MS = 5000; // 5 seconds minimum between scan operations
@@ -320,14 +320,20 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             boolean bluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
             debug.put("bluetoothEnabled", bluetoothEnabled);
             
-            // Replace location permission check with nearby devices permission check
+            // Check permissions based on Android version
             Activity activity = cordova.getActivity();
-            boolean hasNearbyDevicesPermission = true;
+            boolean hasRequiredPermissions = true;
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                hasNearbyDevicesPermission = activity.checkSelfPermission(Manifest.permission.NEARBY_DEVICES) 
+                // For Android 12+, check NEARBY_DEVICES permission
+                hasRequiredPermissions = activity.checkSelfPermission("android.permission.NEARBY_DEVICES") 
+                    == PackageManager.PERMISSION_GRANTED;
+            } else {
+                // For older versions, check location permission
+                hasRequiredPermissions = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
                     == PackageManager.PERMISSION_GRANTED;
             }
-            debug.put("hasNearbyDevicesPermission", hasNearbyDevicesPermission);
+            debug.put("hasRequiredPermissions", hasRequiredPermissions);
             
             callbackContext.success(debug);
         } catch (Exception e) {
@@ -451,7 +457,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         Activity activity = cordova.getActivity();
         List<String> permissionsNeeded = new ArrayList<>();
         
-        // Remove location permission checks and add nearby devices permission
+        // Check for Bluetooth permissions for Android 12+ (API 31+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
                 permissionsNeeded.add(Manifest.permission.BLUETOOTH_SCAN);
@@ -459,12 +465,16 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsNeeded.add(Manifest.permission.BLUETOOTH_CONNECT);
             }
-            if (activity.checkSelfPermission(Manifest.permission.NEARBY_DEVICES) != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(Manifest.permission.NEARBY_DEVICES);
+            // Only use NEARBY_DEVICES on Android 12+
+            if (activity.checkSelfPermission("android.permission.NEARBY_DEVICES") != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add("android.permission.NEARBY_DEVICES");
             }
         } else {
-            // For older Android versions, we still need BLUETOOTH and BLUETOOTH_ADMIN
-            // which are already in the manifest
+            // For older Android versions, we need to check for location permissions
+            // as they're required for Bluetooth scanning on Android 6-11
+            if (activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            }
         }
         
         // Request permissions if needed
