@@ -1,6 +1,6 @@
 # Cordova Beacon Detector Plugin
 
-A Cordova plugin for detecting iBeacons and redirecting to specific URLs based on beacon data.
+A Cordova plugin for detecting iBeacons.
 
 ## Installation
 
