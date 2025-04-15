@@ -35,6 +35,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
     private static final int PERMISSION_REQUEST_BLUETOOTH_SCAN = 3;
     private static final int PERMISSION_REQUEST_BLUETOOTH_CONNECT = 4;
+    private static final int PERMISSION_REQUEST_NEARBY_DEVICES = 5;
     
     // Add rate limiting variables
     private static final long MIN_SCAN_INTERVAL_MS = 5000; // 5 seconds minimum between scan operations
@@ -319,11 +320,14 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             boolean bluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
             debug.put("bluetoothEnabled", bluetoothEnabled);
             
-            // Check permissions
+            // Replace location permission check with nearby devices permission check
             Activity activity = cordova.getActivity();
-            boolean hasLocationPermission = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) 
-                == PackageManager.PERMISSION_GRANTED;
-            debug.put("hasLocationPermission", hasLocationPermission);
+            boolean hasNearbyDevicesPermission = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                hasNearbyDevicesPermission = activity.checkSelfPermission(Manifest.permission.NEARBY_DEVICES) 
+                    == PackageManager.PERMISSION_GRANTED;
+            }
+            debug.put("hasNearbyDevicesPermission", hasNearbyDevicesPermission);
             
             callbackContext.success(debug);
         } catch (Exception e) {
@@ -346,10 +350,13 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             result.put("bluetoothSupport", bluetoothSupport);
             result.put("bluetoothEnabled", bluetoothEnabled);
             
-            // Check location permissions
-            boolean hasLocationPermission = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) 
-                == PackageManager.PERMISSION_GRANTED;
-            result.put("locationPermissions", hasLocationPermission);
+            // Replace location permission check with nearby devices permission check
+            boolean hasNearbyDevicesPermission = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                hasNearbyDevicesPermission = activity.checkSelfPermission(Manifest.permission.NEARBY_DEVICES) 
+                    == PackageManager.PERMISSION_GRANTED;
+            }
+            result.put("hasNearbyDevicesPermission", hasNearbyDevicesPermission);
             
             // Check Bluetooth permissions for Android 12+
             boolean hasBluetoothPermissions = true;
@@ -362,7 +369,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             result.put("bluetoothPermissions", hasBluetoothPermissions);
             
             // Overall compatibility
-            boolean isCompatible = bluetoothSupport && bluetoothEnabled && hasLocationPermission && hasBluetoothPermissions;
+            boolean isCompatible = bluetoothSupport && bluetoothEnabled && hasNearbyDevicesPermission && hasBluetoothPermissions;
             result.put("isCompatible", isCompatible);
             
             callbackContext.success(result);
@@ -444,12 +451,7 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
         Activity activity = cordova.getActivity();
         List<String> permissionsNeeded = new ArrayList<>();
         
-        // Verificar permisos de ubicación
-        if (activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION);
-        }
-        
-        // Verificar permisos de Bluetooth para Android 12+
+        // Remove location permission checks and add nearby devices permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
                 permissionsNeeded.add(Manifest.permission.BLUETOOTH_SCAN);
@@ -457,9 +459,15 @@ public class BeaconDetectorPlugin extends CordovaPlugin implements RangeNotifier
             if (activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsNeeded.add(Manifest.permission.BLUETOOTH_CONNECT);
             }
+            if (activity.checkSelfPermission(Manifest.permission.NEARBY_DEVICES) != PackageManager.PERMISSION_GRANTED) {
+                permissionsNeeded.add(Manifest.permission.NEARBY_DEVICES);
+            }
+        } else {
+            // For older Android versions, we still need BLUETOOTH and BLUETOOTH_ADMIN
+            // which are already in the manifest
         }
         
-        // Solicitar permisos si es necesario
+        // Request permissions if needed
         if (!permissionsNeeded.isEmpty()) {
             cordova.requestPermissions(this, 0, permissionsNeeded.toArray(new String[0]));
             return false;

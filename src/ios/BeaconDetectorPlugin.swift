@@ -48,8 +48,8 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
         }
         
         self.commandDelegate.run {
-            // Request authorization
-            self.requestLocationAuthorization()
+            // Request authorization for Bluetooth usage instead of location
+            self.requestBluetoothAuthorization()
             
             // Create regions for each unique UUID in the beacon data
             var uniqueUUIDs: Set<String> = []
@@ -203,15 +203,21 @@ class BeaconDetectorPlugin: CDVPlugin, CLLocationManagerDelegate {
     
     // MARK: - Helper Methods
     
-    private func requestLocationAuthorization() {
-        let status = CLLocationManager.authorizationStatus()
+    private func requestBluetoothAuthorization() {
+        // In iOS, we don't need to explicitly request Bluetooth authorization
+        // The NSBluetoothAlwaysUsageDescription in Info.plist will trigger the system prompt
+        // when Bluetooth is accessed
         
-        if status == .notDetermined {
-            locationManager.requestAlwaysAuthorization()
-        } else if status == .denied || status == .restricted {
-            print("Location services are disabled for this app")
+        // For iOS 13+, we can check Bluetooth authorization status
+        if #available(iOS 13.0, *) {
+            let cbManager = CBCentralManager()
+            let cbState = cbManager.state
+            print("Bluetooth authorization status: \(cbState.rawValue)")
         }
     }
+    
+    // Remove the location authorization request method
+    // private func requestLocationAuthorization() { ... }
     
     private func calculateDistance(rssi: Int, txPower: Int) -> Double {
         if rssi == 0 {

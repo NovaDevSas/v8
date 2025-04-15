@@ -22,10 +22,10 @@
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.BLUETOOTH" />
             <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <!-- Removed location permissions -->
             <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
             <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+            <uses-permission android:name="android.permission.NEARBY_DEVICES" />
         </config-file>
         
         <framework src="org.altbeacon:android-beacon-library:2.19.5" />
@@ -44,17 +44,7 @@
             <string>This app needs Bluetooth access to detect beacons.</string>
         </config-file>
         
-        <config-file target="*-Info.plist" parent="NSLocationWhenInUseUsageDescription">
-            <string>This app needs location access to detect beacons.</string>
-        </config-file>
-        
-        <config-file target="*-Info.plist" parent="NSLocationAlwaysAndWhenInUseUsageDescription">
-            <string>This app needs location access to detect beacons.</string>
-        </config-file>
-        
-        <config-file target="*-Info.plist" parent="NSLocationAlwaysUsageDescription">
-            <string>This app needs location access to detect beacons.</string>
-        </config-file>
+        <!-- Remove location usage descriptions -->
         
         <source-file src="src/ios/BeaconDetectorPlugin.swift" />
         <dependency id="cordova-plugin-add-swift-support" version="2.0.2" />
